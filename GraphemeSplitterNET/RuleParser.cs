@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -19,11 +20,11 @@ namespace GraphemeSplitterNET
     public async Task<Dictionary<int, int>> ParseAsync(UnicodeVersion version)
     {
       var codePoints = new Dictionary<int, int>();
-      using (var client = new HttpClient()) {
+      using (var client = new WebClient()) { 
 
         var versionStr = ValidateVersion(version);
-        var graphemeTask = client.GetStringAsync(string.Format(GraphemeBreakUrl, versionStr));
-        var emojiTask = client.GetStringAsync(string.Format(EmojiDataUrl, versionStr));
+        var graphemeTask = client.DownloadStringTaskAsync(string.Format(GraphemeBreakUrl, versionStr));
+        var emojiTask = client.DownloadStringTaskAsync(string.Format(EmojiDataUrl, versionStr));
 
         await Task.WhenAll(graphemeTask, emojiTask).ConfigureAwait(false);
 
