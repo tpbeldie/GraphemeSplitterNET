@@ -1,7 +1,42 @@
 ﻿namespace GraphemeSplitterNET
 {
+  /// <summary>
+  /// 
+  /// Am extremely lightweight, zero-memory grapheme splitter 
+  /// using hardcoded, compile-time Unicode rules ranges.
+  /// 
+  /// Its primary advantage is ZERO memory allocation for the rule lookup table,
+  /// making it suitable for extremely memory-constrained environments.
+  /// 
+  ///  :: Trade-offs: ::
+  ///  
+  /// - Performance is O(n) for property lookups, which can be slower than a 
+  /// cached approach for complex text.
+  /// 
+  /// - The rules are frozen at compile time and require manual code changes
+  /// to update to new Unicode versions.
+  /// 
+  /// - This implementation contains a representative subset of rules. 
+  /// A complete implementation would be extremely large.
+  /// 
+  /// </summary>
   public class GraphemeSplitter : Unicode
   {
+
+    /// <summary>
+    /// 
+    /// Zero-memory O(n) Unicode property lookup using hardcoded ranges.
+    /// No arrays, no dictionaries, no memory allocation.
+    /// However, this is a linear checking of ranges, so it's not O(1) like a table lookup. 
+    /// Best case: A character such as CR (0x000D) is found at first sight, super fast.
+    /// Worst case: A character that matches no rule and becomes Other and goes through 
+    /// all checks, still fast but not fast enough.
+    /// 
+    /// And we have to manually handle each case.
+    /// This is the recommended implementation for general-purpose applications. 
+    /// It will suffice for most unpretentious cases.
+    /// 
+    /// </summary>
     public override int GetGraphemeBreakProperty(int codePoint)
     {
       int cp = codePoint;

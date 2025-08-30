@@ -48,6 +48,7 @@ namespace GraphemeSplitterNET
       return s[index];
     }
 
+     // https://www.unicode.org/reports/tr29/#GB3
     protected bool ShouldBreak(int left, int right, List<int> history, int riCount)
     {
       // GB3: CR × LF
@@ -121,7 +122,6 @@ namespace GraphemeSplitterNET
     {
       SplitPrivate(strText, null, nIndex, null, cb);
     }
-
 
     //  Splits a string into a list of its constituent grapheme clusters.
     public List<string> Split(string strText)

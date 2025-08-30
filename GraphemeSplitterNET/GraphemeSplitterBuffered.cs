@@ -4,6 +4,14 @@ using System.IO;
 
 namespace GraphemeSplitterNET
 {
+
+  /// <summary>
+  /// A high-performance, ultra-fast low-memory grapheme cluster splitter compliant with Unicode Standard Annex #29.
+  /// This implementation uses a hybrid data structure (array + dictionary) for true O(1) lookups
+  /// with a minimal memory footprint, and automatically manages a binary cache for instant startup times.
+  /// 
+  /// This is the recommended implementation for particular pretentious cases that requires, such as text editor controls.
+  /// </summary>
   public class GraphemeSplitterBuffered : Unicode
   {
 
