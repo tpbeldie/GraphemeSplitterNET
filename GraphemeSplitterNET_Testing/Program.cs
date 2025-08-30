@@ -13,7 +13,7 @@ namespace GraphemeSplitterNET_Testing
       // Prepare test input.
       StringBuilder input = new StringBuilder();
       for (int i = 0; i < 1_000_000; i++) {
-        input.Append("Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍A̴̵̜̰͔ͫ͗͢L̠ͨͧͩ͘G̴̻͈͍͔̹̑͗̎̅͛́Ǫ̵̹̻̝̳͂̌̌͘!͖̬̰̙̗̿̋ͥͥ̂ͣ̐́́͜͞'汉字👩‍🦰👩‍👩‍👦‍👦🏳️‍🌈Abc");
+        input.Append("Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍A̴̵̜̰͔ͫ͗͢L̠ͨͧͩ͘G̴̻͈͍͔̹̑͗̎̅͛́Ǫ̵̹̻̝̳͂̌̌͘!͖̬̰̙̗̿̋ͥͥ̂ͣ̐́́͜͞'汉字👩‍🦰👩‍👩‍👦‍👦️‍Abc");
       }
       string testString = input.ToString();
 
@@ -43,16 +43,16 @@ namespace GraphemeSplitterNET_Testing
       Debug.WriteLine($"Input length: {input.Length}");
 
       // Show first few clusters from each splitter to verify correctness.
-      Debug.WriteLine("First 10 grapheme clusters (GraphemeSplitter):");
-      for (int i = 0; i < Math.Min(10, clusters1.Count); i++) {
+      Debug.WriteLine("First 20 grapheme clusters (GraphemeSplitter):");
+      for (int i = 0; i < Math.Min(20, clusters1.Count); i++) {
         Debug.WriteLine($"'{clusters1[i]}'");
       }
-      Debug.WriteLine("First 10 grapheme clusters (GraphemeSplitterBuffered):");
-      for (int i = 0; i < Math.Min(10, clusters2.Count); i++) {
+      Debug.WriteLine("First 20 grapheme clusters (GraphemeSplitterBuffered):");
+      for (int i = 0; i < Math.Min(20, clusters2.Count); i++) {
         Debug.WriteLine($"'{clusters2[i]}'");
       }
-      Debug.WriteLine("First 10 grapheme clusters (STGraphemeSplitter):");
-      for (int i = 0; i < Math.Min(10, clusters3.Count); i++) {
+      Debug.WriteLine("First 20 grapheme clusters (STGraphemeSplitter):");
+      for (int i = 0; i < Math.Min(20, clusters3.Count); i++) {
         Debug.WriteLine($"'{clusters3[i]}'");
       }
 
