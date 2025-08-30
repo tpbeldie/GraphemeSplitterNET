@@ -1,10 +1,27 @@
-Benchmark: 
+### .NET Standard 2.0 implementation of the Unicode grapheme cluster breaking algorithm
+There is no point saying the same shit. You can read an article written by my friend [DebugST](https://github.com/DebugST/) for our previous grapheme cluster breaking project [STGraphemeSplitter](https://github.com/DebugST/STGraphemeSplitter)
 
-GraphemeSplitter: 17000000 clusters in 5641ms
-GraphemeSplitterBuffered: 15000000 clusters in 3918ms
-STGraphemeSplitter: 15000000 clusters in 14885ms
-Input length: 102000000
-First 10 grapheme clusters (GraphemeSplitter):
+- This project is its new version. Faster and lighter with minimal code and two different variants where you can chose from.
+
+See GraphemeSplitterNET_Test for usage.
+
+# Benchmark Results
+
+## Performance
+
+- **GraphemeSplitter**: 17,000,000 clusters in **5141ms**
+- **GraphemeSplitterBuffered**: 15,000,000 clusters in **3618ms**
+- **STGraphemeSplitter**: 15,000,000 clusters in **14885ms**
+
+**Input length:** 102,000,000  
+
+---
+
+## INPUT: = Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍A̴̵̜̰͔ͫ͗͢L̠ͨͧͩ͘G̴̻͈͍͔̹̑͗̎̅͛́Ǫ̵̹̻̝̳͂̌̌͘!͖̬̰̙̗̿̋ͥͥ̂ͣ̐́́͜͞'汉字👩‍🦰👩‍👩‍👦‍👦Abc x 1 000 000
+
+## OUTPUT: (First 20 Grapheme Clusters)
+
+# GraphemeSplitter:
 'Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍'
 'A̴̵̜̰͔ͫ͗͢'
 'L̠ͨͧͩ͘'
@@ -15,7 +32,17 @@ First 10 grapheme clusters (GraphemeSplitter):
 '汉'
 '字'
 '👩‍🦰'
-First 10 grapheme clusters (GraphemeSplitterBuffered):
+'👩‍👩‍👦‍👦'
+'️‍'
+'A'
+'b'
+'c'
+'Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍'
+'A̴̵̜̰͔ͫ͗͢'
+'L̠ͨͧͩ͘'
+'G̴̻͈͍͔̹̑͗̎̅͛́'
+'Ǫ̵̹̻̝̳͂̌̌͘'
+# GraphemeSplitterBuffered:
 'Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍'
 'A̴̵̜̰͔ͫ͗͢'
 'L̠ͨͧͩ͘'
@@ -26,7 +53,17 @@ First 10 grapheme clusters (GraphemeSplitterBuffered):
 '汉'
 '字'
 '👩‍🦰'
-First 10 grapheme clusters (STGraphemeSplitter):
+'👩‍👩‍👦‍👦️‍'
+'A'
+'b'
+'c'
+'Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍'
+'A̴̵̜̰͔ͫ͗͢'
+'L̠ͨͧͩ͘'
+'G̴̻͈͍͔̹̑͗̎̅͛́'
+'Ǫ̵̹̻̝̳͂̌̌͘'
+'!͖̬̰̙̗̿̋ͥͥ̂ͣ̐́́͜͞'
+# STGraphemeSplitter:
 'Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍'
 'A̴̵̜̰͔ͫ͗͢'
 'L̠ͨͧͩ͘'
@@ -37,3 +74,13 @@ First 10 grapheme clusters (STGraphemeSplitter):
 '汉'
 '字'
 '👩‍🦰'
+'👩‍👩‍👦‍👦️‍'
+'A'
+'b'
+'c'
+'Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍'
+'A̴̵̜̰͔ͫ͗͢'
+'L̠ͨͧͩ͘'
+'G̴̻͈͍͔̹̑͗̎̅͛́'
+'Ǫ̵̹̻̝̳͂̌̌͘'
+'!͖̬̰̙̗̿̋ͥͥ̂ͣ̐́́͜͞'
