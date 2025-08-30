@@ -92,6 +92,37 @@ namespace GraphemeSplitterNET
       return true; // GB999: Any ÷ Any
     }
 
+    // Calculates the number of grapheme clusters in a string.
+    public int GetLength(string strText)
+    {
+      return SplitPrivate(strText, null, 0, null, null);
+    }
+
+    // Iterates over each grapheme cluster in a string, invoking a callback for each one.
+    public void Each(string strText, EachVoidCallBack cb)
+    {
+      SplitPrivate(strText, null, 0, cb, null);
+    }
+
+    // Iterates over each grapheme cluster in a string, invoking a callback for each one.
+    public void Each(string strText, int nIndex, EachVoidCallBack cb)
+    {
+      SplitPrivate(strText, null, nIndex, cb, null);
+    }
+
+    // Iterates over each grapheme cluster in a string, invoking a callback for each one.
+    public void Each(string strText, EachBoolCallBack cb)
+    {
+      SplitPrivate(strText, null, 0, null, cb);
+    }
+
+    // Iterates over each grapheme cluster in a string, invoking a callback for each one.
+    public void Each(string strText, int nIndex, EachBoolCallBack cb)
+    {
+      SplitPrivate(strText, null, nIndex, null, cb);
+    }
+
+
     //  Splits a string into a list of its constituent grapheme clusters.
     public List<string> Split(string strText)
     {
