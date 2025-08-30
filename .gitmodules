@@ -1,0 +1,3 @@
+[submodule "External/STGraphemeSplitter"]
+	path = External/STGraphemeSplitter
+	url = https://github.com/DebugST/STGraphemeSplitter
