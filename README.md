@@ -1,5 +1,5 @@
 ### .NET Standard 2.0 implementation of the Unicode grapheme cluster breaking algorithm
-There is no point saying the same shit. You can read an article written by my friend [DebugST](https://github.com/DebugST/) for our previous grapheme cluster breaking project [STGraphemeSplitter](https://github.com/DebugST/STGraphemeSplitter)
+There is no point saying the same shit. You can read [this](https://www.codeproject.com/Tips/5317106/Split-grapheme-in-Csharp) article written by my friend [DebugST](https://github.com/DebugST/) for our previous grapheme cluster breaking project [STGraphemeSplitter](https://github.com/DebugST/STGraphemeSplitter)
 
 - This project is its new version. Faster and lighter with minimal code and two different variants where you can chose from.
 
