@@ -3,7 +3,7 @@ There is no point saying the same shit. You can read [this](https://www.codeproj
 
 - This project is its new version. Faster and lighter with minimal code and two different variants where you can chose or extend from.
 
-See GraphemeSplitterNET_Test for usage.
+See GraphemeSplitterNET_Test or the project STGRaphemeSplitter (same behaviour approach .Split .Each) for usage. 
 
 # Benchmark Results
 
