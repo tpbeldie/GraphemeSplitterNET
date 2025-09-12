@@ -63,7 +63,7 @@ See GraphemeSplitterNET_Test or the project STGRaphemeSplitter (same behaviour a
 'G̴̻͈͍͔̹̑͗̎̅͛́'
 'Ǫ̵̹̻̝̳͂̌̌͘'
 '!͖̬̰̙̗̿̋ͥͥ̂ͣ̐́́͜͞'
-# STGraphemeSplitter (No cache):
+# STGraphemeSplitter (no cache):
 'Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍'
 'A̴̵̜̰͔ͫ͗͢'
 'L̠ͨͧͩ͘'
