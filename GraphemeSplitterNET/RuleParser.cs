@@ -11,8 +11,8 @@ namespace GraphemeSplitterNET
   public class RuleParser
   {
 
-    private const string GraphemeBreakUrl = "https://unicode.org/Public/UCD/{0}/ucd/auxiliary/GraphemeBreakProperty.txt";
-    private const string EmojiDataUrl = "https://www.unicode.org/Public/UCD/{0}/ucd/emoji/emoji-data.txt";
+    private const string GraphemeBreakUrl = "https://www.unicode.org/Public/{0}/ucd/auxiliary/GraphemeBreakProperty.txt";
+    private const string EmojiDataUrl = "https://www.unicode.org/Public/{0}/ucd/emoji/emoji-data.txt";
 
     /// <summary>
     /// Asynchronously downloads and parses the Unicode data files.
