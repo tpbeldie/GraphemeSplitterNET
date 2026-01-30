@@ -2,6 +2,7 @@
 There is no point saying the same shit. You can read [this](https://www.codeproject.com/Tips/5317106/Split-grapheme-in-Csharp) article written by my friend [DebugST](https://github.com/DebugST/) for our previous grapheme cluster breaking project [STGraphemeSplitter](https://github.com/DebugST/STGraphemeSplitter)
 
 - This project is its new version. Faster and lighter with minimal code and two different variants where you can chose or extend from.
+- **GraphemeSplitterBuffered**: The recommended implementation using O(1) lookups and binary caching. Now supports `NextBreak` (cursor iteration) and `GetBreaks` (bulk index retrieval) for zero-allocation performance.
 
 See GraphemeSplitterNET_Test or the project STGRaphemeSplitter (same behaviour approach .Split .Each) for usage. 
 
@@ -9,11 +10,14 @@ See GraphemeSplitterNET_Test or the project STGRaphemeSplitter (same behaviour a
 
 ## Performance
 
-- **GraphemeSplitter**: 17,000,000 clusters in **5141ms**
-- **GraphemeSplitterBuffered**: 15,000,000 clusters in **3618ms**
-- **STGraphemeSplitter**: 15,000,000 clusters in **14885ms**
+- **GraphemeSplitterBuffered (GetBreaks)**: 14,000,000 clusters in **3153ms** (Indices only)
+- **GraphemeSplitterBuffered (Split)**: 14,000,000 clusters in **3911ms**
+- **GraphemeSplitterBuffered (NextBreak)**: 14,000,000 clusters in **4198ms** (Iteration)
+- **GraphemeSplitter**: 15,000,000 clusters in **5447ms**
+- **STGraphemeSplitter (Dict)**: 14,000,000 clusters in **5939ms**
+- **STGraphemeSplitter (Array)**: 14,000,000 clusters in **6286ms**
 
-**Input length:** 102,000,000  
+**Input length:** 98,000,000  
 
 ---
 
