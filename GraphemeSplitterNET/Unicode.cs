@@ -71,16 +71,19 @@ namespace GraphemeSplitterNET
       if (left == Prepend) return false;
 
       // GB11: Extended_Pictographic Extend* ZWJ × Extended_Pictographic
-      if (right == Extended_Pictographic) {
-        if (history.Count >= 2 && history[history.Count - 1] == ZWJ) {
+      // Check if we have a ZWJ followed by another Extended_Pictographic
+      if (right == Extended_Pictographic && history.Count >= 2) {
+        // The immediately preceding character should be ZWJ
+        if (history[history.Count - 1] == ZWJ) {
+          // Look back past any Extend characters to find if there's an Extended_Pictographic
           for (int i = history.Count - 2; i >= 0; i--) {
             if (history[i] == Extend) {
-              continue;
+              continue; // Skip over Extend characters
             }
             if (history[i] == Extended_Pictographic) {
-              return false;
+              return false; // Don't break: emoji ZWJ sequence continues
             }
-            break;
+            break; // Stop at first non-Extend character
           }
         }
       }
