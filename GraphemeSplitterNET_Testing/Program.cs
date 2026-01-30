@@ -31,16 +31,43 @@ namespace GraphemeSplitterNET_Testing
       sw.Stop();
       long time2 = sw.ElapsedMilliseconds;
 
-      // Benchmark STGraphemeSplitter.
+      // Benchmark STGraphemeSplitter (Dictionary Cache).
       STGraphemeSplitter.CreateDictionaryCache(); 
       sw.Restart();
       var clusters3 = STGraphemeSplitter.Split(testString);
       sw.Stop();
       long time3 = sw.ElapsedMilliseconds;
 
+      // Benchmark STGraphemeSplitter (Array Cache).
+      STGraphemeSplitter.CreateArrayCache();
+      sw.Restart();
+      var clusters4 = STGraphemeSplitter.Split(testString);
+      sw.Stop();
+      long time3_array = sw.ElapsedMilliseconds;
+
+      // Benchmark NextBreak (Streaming/Cursor approach) - Using Buffered
+      sw.Restart();
+      int countNextBreak = 0;
+      int idx = 0;
+      while (idx < testString.Length) {
+        idx = splitterBuffered.NextBreak(testString, idx);
+        countNextBreak++;
+      }
+      sw.Stop();
+      long time4 = sw.ElapsedMilliseconds;
+
+      // Benchmark GetBreaks (Bulk index retrieval) - Using Buffered
+      sw.Restart();
+      var breaks = splitterBuffered.GetBreaks(testString);
+      sw.Stop();
+      long time5 = sw.ElapsedMilliseconds;
+
       Debug.WriteLine($"GraphemeSplitter: {clusters1.Count} clusters in {time1}ms");
       Debug.WriteLine($"GraphemeSplitterBuffered: {clusters2.Count} clusters in {time2}ms");
-      Debug.WriteLine($"STGraphemeSplitter: {clusters3.Count} clusters in {time3}ms");
+      Debug.WriteLine($"STGraphemeSplitter (Dict): {clusters3.Count} clusters in {time3}ms");
+      Debug.WriteLine($"STGraphemeSplitter (Array): {clusters4.Count} clusters in {time3_array}ms");
+      Debug.WriteLine($"NextBreak (Buffered Iteration): {countNextBreak} clusters in {time4}ms");
+      Debug.WriteLine($"GetBreaks (Buffered Indices): {breaks.Count} clusters in {time5}ms");
       Debug.WriteLine($"Input length: {input.Length}");
 
       // Show first few clusters from each splitter to verify correctness.

@@ -140,6 +140,100 @@ namespace GraphemeSplitterNET
       return listResult;
     }
 
+    /// <summary>
+    /// Gets a list of start indices for each grapheme cluster. 
+    /// This is much faster than Split() for large text as it avoids string allocations.
+    /// Useful for mapping grapheme clusters to character positions.
+    /// </summary>
+    public List<int> GetBreaks(string strText)
+    {
+       var boundaries = new List<int>(strText.Length / 2);
+       if (string.IsNullOrEmpty(strText)) return boundaries;
+       boundaries.Add(0); // First cluster always starts at 0
+
+       // Reimplement core loop optimized for just indices
+       int riCounter = 0;
+       var history = new List<int>(4);
+
+       int currentIndex = 0;
+       int charLen;
+
+       int codePoint = GetCodePoint(strText, currentIndex);
+       int breakTypeLeft = GetGraphemeBreakProperty(codePoint);
+       charLen = codePoint >= 0x10000 ? 2 : 1;
+       currentIndex += charLen;
+       history.Add(breakTypeLeft);
+
+       while (currentIndex < strText.Length) {
+         codePoint = GetCodePoint(strText, currentIndex);
+         int breakTypeRight = GetGraphemeBreakProperty(codePoint);
+         int currentCodeLen = codePoint >= 0x10000 ? 2 : 1;
+
+         if (breakTypeLeft == Regional_Indicator) riCounter++; else riCounter = 0;
+
+         if (ShouldBreak(breakTypeLeft, breakTypeRight, history, riCounter)) {
+           boundaries.Add(currentIndex);
+           history.Clear();
+           riCounter = 0;
+         }
+
+         history.Add(breakTypeRight);
+         currentIndex += currentCodeLen;
+         breakTypeLeft = breakTypeRight;
+       }
+       // Last boundary is effectively the length, but usually not included as a "start index" of a cluster unless we want the end.
+       // The list is "Start Indices".
+       return boundaries;
+    }
+
+    /// <summary>
+    /// Finds the index of the next grapheme cluster boundary after the specified start index.
+    /// This method is zero-allocation (if history list reused) and highly optimized for iterating or cursor movement.
+    /// </summary>
+    /// <param name="strText">The text to analyze.</param>
+    /// <param name="startIndex">The index to start looking from.</param>
+    /// <returns>The index of the next break, or strText.Length if no more breaks are found.</returns>
+    public int NextBreak(string strText, int startIndex)
+    {
+      if (string.IsNullOrEmpty(strText) || startIndex >= strText.Length) return strText?.Length ?? 0;
+
+      int riCounter = 0;
+      // Optimize: Only allocate if we hit complex rules, or just accept the small alloc for now?
+      // For "Super Hyper" loops, user should use GetBreaks(). 
+      // NextBreak is for interactive cursor.
+      var history = new List<int>(4);
+
+      int currentIndex = startIndex;
+      int charLen;
+
+      int codePoint = GetCodePoint(strText, currentIndex);
+      int breakTypeLeft = GetGraphemeBreakProperty(codePoint);
+      charLen = codePoint >= 0x10000 ? 2 : 1;
+      currentIndex += charLen;
+      
+      // If we blindly start in the middle, we assume it's a valid boundary.
+      history.Add(breakTypeLeft);
+
+      while (currentIndex < strText.Length) {
+        codePoint = GetCodePoint(strText, currentIndex);
+        int breakTypeRight = GetGraphemeBreakProperty(codePoint);
+        int currentCodeLen = codePoint >= 0x10000 ? 2 : 1;
+
+        if (breakTypeLeft == Regional_Indicator) riCounter++; else riCounter = 0;
+
+        // Uses the same logic as SplitPrivate to decide if a break happens here
+        if (ShouldBreak(breakTypeLeft, breakTypeRight, history, riCounter)) {
+           return currentIndex; // Found the break!
+        }
+
+         history.Add(breakTypeRight);
+         currentIndex += currentCodeLen;
+         breakTypeLeft = breakTypeRight;
+      }
+      
+      return currentIndex; // End of string is always a break
+    }
+
     private int SplitPrivate(string strText, List<string> listResult, int currentIndex, EachVoidCallBack cbVoid, EachBoolCallBack cbBool)
     {
       if (string.IsNullOrEmpty(strText)) return 0;
