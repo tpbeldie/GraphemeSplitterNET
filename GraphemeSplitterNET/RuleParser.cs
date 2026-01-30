@@ -60,6 +60,8 @@ namespace GraphemeSplitterNET
             var rangeParts = codeRangeStr.Split(new[] { ".." }, StringSplitOptions.None);
             int start = int.Parse(rangeParts[0], NumberStyles.HexNumber);
             int end = int.Parse(rangeParts[1], NumberStyles.HexNumber);
+            // Ensure end doesn't exceed valid Unicode code point range (U+10FFFF = 1,114,111)
+            if (end > 0x10FFFF) end = 0x10FFFF;
             for (int i = start; i <= end; i++) {
               codePoints[i] = propertyType;
             }
