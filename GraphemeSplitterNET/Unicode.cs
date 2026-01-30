@@ -170,6 +170,7 @@ namespace GraphemeSplitterNET
           charStart = currentIndex;
           charLen = currentCodeLen;
           history.Clear();
+          riCounter = 0;  // Reset RI counter when starting a new grapheme cluster
         }
         else {
           charLen += currentCodeLen;
