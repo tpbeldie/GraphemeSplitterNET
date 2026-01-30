@@ -119,9 +119,10 @@ namespace GraphemeSplitterNET
     public override int GetGraphemeBreakProperty(int codePoint)
     {
       if (codePoint < 65536) {
+        if (m_bmp_cache == null) return Other;
         return m_bmp_cache[codePoint];
       }
-      if (m_supplementary_cache.TryGetValue(codePoint, out int value)) {
+      if (m_supplementary_cache != null && m_supplementary_cache.TryGetValue(codePoint, out int value)) {
         return value;
       }
       return Other;
