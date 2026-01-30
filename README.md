@@ -10,12 +10,13 @@ See GraphemeSplitterNET_Test or the project STGRaphemeSplitter (same behaviour a
 
 ## Performance
 
-- **GraphemeSplitterBuffered (GetBreaks)**: 14,000,000 clusters in **3153ms** (Indices only)
-- **GraphemeSplitterBuffered (Split)**: 14,000,000 clusters in **3911ms**
-- **GraphemeSplitterBuffered (NextBreak)**: 14,000,000 clusters in **4198ms** (Iteration)
-- **GraphemeSplitter**: 15,000,000 clusters in **5447ms**
-- **STGraphemeSplitter (Dict)**: 14,000,000 clusters in **5939ms**
-- **STGraphemeSplitter (Array)**: 14,000,000 clusters in **6286ms**
+- **GraphemeSplitterBuffered (GetBreaks)**: 14,000,000 clusters in **3123ms** (Indices only)
+- **GraphemeSplitterBuffered (Split)**: 14,000,000 clusters in **3908ms**
+- **GraphemeSplitterBuffered (NextBreak)**: 14,000,000 clusters in **3870ms** (Iteration)
+- **GraphemeSplitter**: 15,000,000 clusters in **5479ms**
+- **STGraphemeSplitter (Dict)**: 14,000,000 clusters in **6333ms**
+- **STGraphemeSplitter (Array)**: 14,000,000 clusters in **9832ms**
+- **STGraphemeSplitter (No Cache)**: 14,000,000 clusters in **21434ms**
 
 **Input length:** 98,000,000  
 

@@ -31,6 +31,13 @@ namespace GraphemeSplitterNET_Testing
       sw.Stop();
       long time2 = sw.ElapsedMilliseconds;
 
+      // Benchmark STGraphemeSplitter (No Cache).
+      STGraphemeSplitter.ClearCache();
+      sw.Restart();
+      var clusters3_nocache = STGraphemeSplitter.Split(testString);
+      sw.Stop();
+      long time3_nocache = sw.ElapsedMilliseconds;
+
       // Benchmark STGraphemeSplitter (Dictionary Cache).
       STGraphemeSplitter.CreateDictionaryCache(); 
       sw.Restart();
@@ -64,6 +71,7 @@ namespace GraphemeSplitterNET_Testing
 
       Debug.WriteLine($"GraphemeSplitter: {clusters1.Count} clusters in {time1}ms");
       Debug.WriteLine($"GraphemeSplitterBuffered: {clusters2.Count} clusters in {time2}ms");
+      Debug.WriteLine($"STGraphemeSplitter (No Cache): {clusters3_nocache.Count} clusters in {time3_nocache}ms");
       Debug.WriteLine($"STGraphemeSplitter (Dict): {clusters3.Count} clusters in {time3}ms");
       Debug.WriteLine($"STGraphemeSplitter (Array): {clusters4.Count} clusters in {time3_array}ms");
       Debug.WriteLine($"NextBreak (Buffered Iteration): {countNextBreak} clusters in {time4}ms");
