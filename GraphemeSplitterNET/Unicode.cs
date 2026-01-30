@@ -182,7 +182,7 @@ namespace GraphemeSplitterNET
 
       listResult?.Add(strText.Substring(charStart, charLen));
       cbVoid?.Invoke(strText, charStart, charLen);
-      cbBool?.Invoke(strText, charStart, charLen);
+      if (cbBool != null && !cbBool(strText, charStart, charLen)) return count + 1;
 
       return count + 1;
     }

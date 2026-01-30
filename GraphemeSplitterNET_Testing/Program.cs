@@ -32,6 +32,7 @@ namespace GraphemeSplitterNET_Testing
       long time2 = sw.ElapsedMilliseconds;
 
       // Benchmark STGraphemeSplitter.
+      STGraphemeSplitter.CreateDictionaryCache(); 
       sw.Restart();
       var clusters3 = STGraphemeSplitter.Split(testString);
       sw.Stop();
