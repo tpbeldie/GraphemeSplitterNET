@@ -8,6 +8,9 @@
   /// Its primary advantage is ZERO memory allocation for the rule lookup table,
   /// making it suitable for extremely memory-constrained environments.
   /// 
+  /// UNICODE VERSION: These rules are based on Unicode 15.0.
+  /// For updates to newer Unicode versions, use GraphemeSplitterBuffered instead.
+  /// 
   ///  :: Trade-offs: ::
   ///  
   /// - Performance is O(n) for property lookups, which can be slower than a 
