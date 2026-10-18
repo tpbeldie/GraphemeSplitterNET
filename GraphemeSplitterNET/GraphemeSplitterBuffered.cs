@@ -1,131 +1,164 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace GraphemeSplitterNET
 {
 
   /// <summary>
-  /// A high-performance, ultra-fast low-memory grapheme cluster splitter compliant with Unicode Standard Annex #29.
-  /// This implementation uses a hybrid data structure (array + dictionary) for true O(1) lookups
-  /// with a minimal memory footprint, and automatically manages a binary cache for instant startup times.
+  /// Same splitter as GraphemeSplitter, but the Unicode data is downloaded from unicode.org
+  /// (latest version by default) and cached on disk, so the rules can follow new Unicode
+  /// releases without recompiling.
   /// 
-  /// This is the recommended implementation for particular pretentious cases that requires, such as text editor controls.
+  /// - First use downloads ~1.3 MB of UCD text files once, builds the compact table and
+  ///   saves it (~tens of KB) to CacheDirectory. Next runs only read the cache.
+  /// - If the download fails (offline, proxy...) it falls back to the embedded table,
+  ///   so it never ends up with an empty table.
+  /// - Tables are shared between instances of the same version.
   /// </summary>
   public class GraphemeSplitterBuffered : Unicode
   {
 
-    private static int[] m_bmp_cache;
+    private static readonly Dictionary<UnicodeVersion, Lazy<GraphemeTable>> s_tables = new Dictionary<UnicodeVersion, Lazy<GraphemeTable>>();
 
-    private static Dictionary<int, int> m_supplementary_cache;
+    private static readonly object s_lock = new object();
 
-    public static readonly UnicodeVersion UnicodeVersion = UnicodeVersion.Unicode_Latest;
+    /// <summary>
+    /// Folder where downloaded tables are cached. Set to null to disable the cache.
+    /// Defaults to %LOCALAPPDATA%\GraphemeSplitterNET.
+    /// </summary>
+    public static string CacheDirectory { get; set; } =
+      Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GraphemeSplitterNET");
 
-    private static readonly Lazy<bool> s_initializer = new Lazy<bool>(Initialize, isThreadSafe: true);
+    /// <summary>
+    /// How long a cached Unicode_Latest table is trusted before checking unicode.org again.
+    /// Pinned versions never expire, their data never changes.
+    /// </summary>
+    public static TimeSpan LatestCacheLifetime { get; set; } = TimeSpan.FromDays(30);
 
-    public GraphemeSplitterBuffered()
+    /// <summary>
+    /// The exception of the last failed download, if the embedded table was used as fallback.
+    /// </summary>
+    public static Exception LastError { get; private set; }
+
+    public UnicodeVersion RequestedVersion { get; }
+
+    public GraphemeSplitterBuffered() : this(UnicodeVersion.Unicode_Latest)
     {
-      EnsureInitialized();
     }
 
-    private static void EnsureInitialized()
+    public GraphemeSplitterBuffered(UnicodeVersion version) : base(GetTable(version))
     {
-      _ = s_initializer.Value;
+      RequestedVersion = version;
     }
 
-    private static bool TryLoadCache(string cachePath)
+    private GraphemeSplitterBuffered(UnicodeVersion version, GraphemeTable table) : base(table)
     {
-      if (File.Exists(cachePath)) {
-        try {
-          using (var stream = new FileStream(cachePath, FileMode.Open, FileAccess.Read))
-          using (var reader = new BinaryReader(stream)) {
-            int supplementaryCount = reader.ReadInt32();
-            m_supplementary_cache = new Dictionary<int, int>(supplementaryCount);
-            for (int i = 0; i < supplementaryCount; i++) {
-              m_supplementary_cache.Add(reader.ReadInt32(), reader.ReadInt32());
-            }
-            byte[] bmpBytes = reader.ReadBytes(65536 * 4);
-            m_bmp_cache = new int[65536];
-            Buffer.BlockCopy(bmpBytes, 0, m_bmp_cache, 0, bmpBytes.Length);
+      RequestedVersion = version;
+    }
 
-            return true;
-          }
-        }
-        catch (Exception ex) {
-          Console.WriteLine($"Could not read grapheme cache: {ex.Message}. Rebuilding...");
+    /// <summary>
+    /// Non-blocking way to create the splitter, recommended from UI threads.
+    /// </summary>
+    public static Task<GraphemeSplitterBuffered> CreateAsync(UnicodeVersion version = UnicodeVersion.Unicode_Latest)
+    {
+#if NET40
+      return Task.Factory.StartNew(() => new GraphemeSplitterBuffered(version, GetTable(version)));
+#else
+      return Task.Run(() => new GraphemeSplitterBuffered(version, GetTable(version)));
+#endif
+    }
+
+    /// <summary>
+    /// Forgets loaded tables and deletes the cache files, forcing a new download next time.
+    /// </summary>
+    public static void ClearCache()
+    {
+      lock (s_lock) {
+        s_tables.Clear();
+      }
+      var dir = CacheDirectory;
+      if (dir == null || !Directory.Exists(dir)) return;
+      foreach (var file in Directory.GetFiles(dir, "grapheme-*.cache")) {
+        try { File.Delete(file); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+      }
+    }
+
+    private static GraphemeTable GetTable(UnicodeVersion version)
+    {
+      Lazy<GraphemeTable> lazy;
+      lock (s_lock) {
+        if (!s_tables.TryGetValue(version, out lazy)) {
+          lazy = new Lazy<GraphemeTable>(() => LoadTable(version), isThreadSafe: true);
+          s_tables.Add(version, lazy);
         }
       }
-      return false;
+      return lazy.Value;
     }
 
-    private static void TryCreateCache(string cachePath)
+    private static GraphemeTable LoadTable(UnicodeVersion version)
     {
+      string cachePath = CacheDirectory == null ? null : Path.Combine(CacheDirectory, "grapheme-" + version + ".cache");
+
+      GraphemeTable cached = TryLoadCache(cachePath);
+      bool expired = cached != null
+        && version == UnicodeVersion.Unicode_Latest
+        && DateTime.UtcNow - File.GetLastWriteTimeUtc(cachePath) > LatestCacheLifetime;
+
+      if (cached != null && !expired) {
+        return cached;
+      }
+
       try {
-        using (var stream = new FileStream(cachePath, FileMode.Create, FileAccess.Write))
-        using (var writer = new BinaryWriter(stream)) {
-          writer.Write(m_supplementary_cache.Count);
-          foreach (var kvp in m_supplementary_cache) {
-            writer.Write(kvp.Key);
-            writer.Write(kvp.Value);
-          }
-
-          byte[] bmpBytes = new byte[m_bmp_cache.Length * 4];
-          Buffer.BlockCopy(m_bmp_cache, 0, bmpBytes, 0, bmpBytes.Length);
-          writer.Write(bmpBytes);
-
-          Console.WriteLine($"Cache created at: {cachePath}");
-        }
+#if NET40
+        var table = Task.Factory.StartNew(() => new RuleParser().DownloadAsync(version).Result).Result;
+#else
+        // Task.Run avoids deadlocks when called from a thread with a SynchronizationContext (WinForms/WPF).
+        var table = Task.Run(() => new RuleParser().DownloadAsync(version)).GetAwaiter().GetResult();
+#endif
+        TryCreateCache(cachePath, table);
+        LastError = null;
+        return table;
       }
       catch (Exception ex) {
-        Console.WriteLine($"Warning: Could not save grapheme cache: {ex.Message}");
+        LastError = ex;
+        // Prefer an outdated download over the embedded data, it is at least as new.
+        return cached ?? GraphemeTable.Embedded;
       }
     }
 
-    private static bool Initialize()
+    private static GraphemeTable TryLoadCache(string cachePath)
     {
-      string cachePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "grapheme.cache");
-      if (TryLoadCache(cachePath)) {
-        return true; // Initialized.
-      }
-      TryBuildCaches();
-      TryCreateCache(cachePath);
-      return true;
-    }
-
-    private static void TryBuildCaches()
-    {
+      if (cachePath == null || !File.Exists(cachePath)) return null;
       try {
-        Console.WriteLine("Parsing Unicode rules for the first time. This may take a moment...");
-        var parser = new RuleParser();
-        var allCodePoints = parser.ParseAsync(UnicodeVersion).GetAwaiter().GetResult();
-
-        m_bmp_cache = new int[65536];
-        m_supplementary_cache = new Dictionary<int, int>();
-
-        foreach (var kvp in allCodePoints) {
-          if (kvp.Key < 65536)
-            m_bmp_cache[kvp.Key] = kvp.Value;
-          else
-            m_supplementary_cache[kvp.Key] = kvp.Value;
+        using (var stream = new FileStream(cachePath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+          return GraphemeTable.Read(stream);
         }
       }
-      catch (Exception ex) {
-        Console.WriteLine($"Error building grapheme caches: {ex.Message}");
-        m_bmp_cache = new int[65536];
-        m_supplementary_cache = new Dictionary<int, int>();
+      catch (Exception) {
+        return null; // Corrupted or old format, rebuild it.
       }
     }
 
-    public override int GetGraphemeBreakProperty(int codePoint)
+    private static void TryCreateCache(string cachePath, GraphemeTable table)
     {
-      if (codePoint < 65536) {
-        if (m_bmp_cache == null) return Other;
-        return m_bmp_cache[codePoint];
+      if (cachePath == null) return;
+      try {
+        Directory.CreateDirectory(Path.GetDirectoryName(cachePath));
+        // Write to a temp file first so a crash never leaves a half written cache.
+        string tempPath = cachePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write)) {
+          table.Write(stream);
+        }
+        if (File.Exists(cachePath)) File.Delete(cachePath);
+        File.Move(tempPath, cachePath);
       }
-      if (m_supplementary_cache != null && m_supplementary_cache.TryGetValue(codePoint, out int value)) {
-        return value;
+      catch (Exception) {
+        // The cache is only an optimization.
       }
-      return Other;
     }
   }
 }

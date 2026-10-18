@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 
 namespace GraphemeSplitterNET
 {
@@ -13,6 +14,7 @@ namespace GraphemeSplitterNET
     Unicode_15,
     Unicode_16,
     Unicode_17,
+    Unicode_18,
     Unicode_Latest
   }
 
@@ -38,7 +40,30 @@ namespace GraphemeSplitterNET
     public const int ZWJ = 15;
     public const int Extended_Pictographic = 18;
 
-    public abstract int GetGraphemeBreakProperty(int codePoint);
+    private GraphemeTable m_table;
+
+    protected Unicode(GraphemeTable table)
+    {
+      m_table = table ?? throw new ArgumentNullException(nameof(table));
+    }
+
+    /// <summary>
+    /// The lookup table used by this splitter.
+    /// </summary>
+    public GraphemeTable Table
+    {
+      get { return m_table; }
+      protected set { m_table = value ?? throw new ArgumentNullException(nameof(value)); }
+    }
+
+    /// <summary>
+    /// Returns the grapheme break property of a code point.
+    /// Note: the splitting loop reads the table directly for speed, it does not call this method.
+    /// </summary>
+    public virtual int GetGraphemeBreakProperty(int codePoint)
+    {
+      return m_table.GetProperty(codePoint);
+    }
 
     protected int GetCodePoint(string s, int index)
     {
@@ -48,82 +73,168 @@ namespace GraphemeSplitterNET
       return s[index];
     }
 
-     // https://www.unicode.org/reports/tr29/#GB3
-    protected bool ShouldBreak(int left, int right, List<int> history, int riCount)
+    /// :::::::: Core ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /// https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundary_Rules
+    /// 
+    /// Every rule only looks inside the current cluster, so instead of keeping a history list
+    /// we carry four tiny pieces of state that are reset implicitly on each new cluster:
+    /// 
+    ///   riCount  - number of consecutive Regional_Indicator ending at the left char (GB12/13).
+    ///   emojiSeq - we are in  Extended_Pictographic Extend*      (GB11).
+    ///   emojiZwj - we are in  Extended_Pictographic Extend* ZWJ  (GB11).
+    ///   incb     - 1: InCB Consonant [Extend|Linker]*            (GB9c).
+    ///              2: same, with at least one Linker seen.
+    /// ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+    // Returns the end of the cluster starting at index. index must be < s.Length.
+    private int NextBoundary(string s, int index)
     {
-      // GB3: CR × LF
-      if (left == CR && right == LF) return false;
-      // GB4: (Control | CR | LF) ÷
-      if (left == Control || left == CR || left == LF) return true;
-      // GB5: ÷ (Control | CR | LF)
-      if (right == Control || right == CR || right == LF) return true;
-      // GB6: L × (L | V | LV | LVT)
-      if (left == L && (right == L || right == V || right == LV || right == LVT)) return false;
-      // GB7: (LV | V) × (V | T)
-      if ((left == LV || left == V) && (right == V || right == T)) return false;
-      // GB8: (LVT | T) × T
-      if ((left == LVT || left == T) && (right == T)) return false;
-      // GB9: × (Extend | ZWJ)
-      if (right == Extend || right == ZWJ) return false;
-      // GB9a: × SpacingMark
-      if (right == SpacingMark) return false;
-      // GB9b: Prepend ×
-      if (left == Prepend) return false;
+      int length = s.Length;
+      char c = s[index];
 
-      // GB11: Extended_Pictographic Extend* ZWJ × Extended_Pictographic
-      // Check if we have a ZWJ followed by another Extended_Pictographic
-      if (right == Extended_Pictographic && history.Count >= 2) {
-        // The immediately preceding character should be ZWJ
-        if (history[history.Count - 1] == ZWJ) {
-          // Look back past any Extend characters to find if there's an Extended_Pictographic
-          for (int i = history.Count - 2; i >= 0; i--) {
-            if (history[i] == Extend) {
-              continue; // Skip over Extend characters
-            }
-            if (history[i] == Extended_Pictographic) {
-              return false; // Don't break: emoji ZWJ sequence continues
-            }
-            break; // Stop at first non-Extend character
-          }
+      // ASCII fast path: printable ASCII is Other, and nothing below U+0300
+      // (Extend, ZWJ, SpacingMark) can be glued to it, so it is always a single cluster.
+      if (c >= 0x20 && c < 0x7F) {
+        int n = index + 1;
+        if (n >= length || s[n] < 0x0300) return n;
+      }
+
+      ushort[] stage1 = m_table.Stage1;
+      byte[] stage2 = m_table.Stage2;
+
+      int cp = c;
+      int pos = index + 1;
+      if ((uint)(c - 0xD800) <= 0x3FF && pos < length && (uint)(s[pos] - 0xDC00) <= 0x3FF) {
+        cp = ((c - 0xD800) << 10) + (s[pos] - 0xDC00) + 0x10000;
+        pos++;
+      }
+
+      int left = stage2[(stage1[cp >> 8] << 8) | (cp & 0xFF)];
+      int lp = left & GraphemeTable.PropertyMask;
+
+      int riCount = lp == Regional_Indicator ? 1 : 0;
+      bool emojiSeq = lp == Extended_Pictographic;
+      bool emojiZwj = false;
+      bool incbLinker = (left & GraphemeTable.InCBMask) == GraphemeTable.InCB_Linker;
+
+      while (pos < length) {
+        c = s[pos];
+        cp = c;
+        int next = pos + 1;
+        if ((uint)(c - 0xD800) <= 0x3FF && next < length && (uint)(s[next] - 0xDC00) <= 0x3FF) {
+          cp = ((c - 0xD800) << 10) + (s[next] - 0xDC00) + 0x10000;
+          next++;
         }
-      }
 
-      // GB12 & GB13: Regional indicators
-      if (left == Regional_Indicator && right == Regional_Indicator && riCount % 2 == 1) {
-        return false;
-      }
+        int right = stage2[(stage1[cp >> 8] << 8) | (cp & 0xFF)];
+        int rp = right & GraphemeTable.PropertyMask;
+        int rIncb = right & GraphemeTable.InCBMask;
 
-      return true; // GB999: Any ÷ Any
+        bool join;
+        if (lp == CR || lp == LF || lp == Control) {
+          // GB3: CR × LF, GB4: (Control | CR | LF) ÷
+          join = lp == CR && rp == LF;
+        }
+        else if (rp == CR || rp == LF || rp == Control) {
+          // GB5: ÷ (Control | CR | LF)
+          join = false;
+        }
+        else if (rp == Extend || rp == ZWJ || rp == SpacingMark || lp == Prepend) {
+          // GB9: × (Extend | ZWJ), GB9a: × SpacingMark, GB9b: Prepend ×
+          join = true;
+        }
+        else {
+          join =
+            // GB6: L × (L | V | LV | LVT)
+            (lp == L && (rp == L || rp == V || rp == LV || rp == LVT)) ||
+            // GB7: (LV | V) × (V | T)
+            ((lp == LV || lp == V) && (rp == V || rp == T)) ||
+            // GB8: (LVT | T) × T
+            ((lp == LVT || lp == T) && rp == T) ||
+            // GB9c: \p{InCB=Linker} [\p{InCB=Extend} \p{InCB=Linker}]* × \p{InCB=Consonant}
+            (incbLinker && rIncb == GraphemeTable.InCB_Consonant) ||
+            // GB11: ExtPict Extend* ZWJ × ExtPict
+            (emojiZwj && rp == Extended_Pictographic) ||
+            // GB12/GB13: RI pairs
+            (lp == Regional_Indicator && rp == Regional_Indicator && (riCount & 1) == 1);
+        }
+
+        if (!join) return pos; // GB999: Any ÷ Any
+
+        // Advance the state with the right char.
+        if (rIncb == GraphemeTable.InCB_Linker) incbLinker = true;
+        else if (rIncb != GraphemeTable.InCB_Extend) incbLinker = false;
+
+        emojiZwj = emojiSeq && rp == ZWJ;
+        emojiSeq = rp == Extended_Pictographic || (emojiSeq && rp == Extend);
+        riCount = rp == Regional_Indicator ? riCount + 1 : 0;
+
+        lp = rp;
+        pos = next;
+      }
+      return length;
     }
+
+    /// :::::::: Public API :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
     // Calculates the number of grapheme clusters in a string.
     public int GetLength(string strText)
     {
-      return SplitPrivate(strText, null, 0, null, null);
+      if (string.IsNullOrEmpty(strText)) return 0;
+      int count = 0;
+      for (int i = 0; i < strText.Length; i = NextBoundary(strText, i)) {
+        count++;
+      }
+      return count;
+    }
+
+    // Same as GetLength, named after STGraphemeSplitter.GetCount.
+    public int GetCount(string strText)
+    {
+      return GetLength(strText);
     }
 
     // Iterates over each grapheme cluster in a string, invoking a callback for each one.
     public void Each(string strText, EachVoidCallBack cb)
     {
-      SplitPrivate(strText, null, 0, cb, null);
+      Each(strText, 0, cb);
     }
 
-    // Iterates over each grapheme cluster in a string, invoking a callback for each one.
+    // Iterates over each grapheme cluster starting at nIndex, invoking a callback for each one.
+    // nIndex is assumed to be a cluster boundary. Reported indices are relative to strText.
     public void Each(string strText, int nIndex, EachVoidCallBack cb)
     {
-      SplitPrivate(strText, null, nIndex, cb, null);
+      if (cb == null) throw new ArgumentNullException(nameof(cb));
+      if (string.IsNullOrEmpty(strText)) return;
+      CheckIndex(strText, nIndex);
+      int i = nIndex;
+      while (i < strText.Length) {
+        int end = NextBoundary(strText, i);
+        cb(strText, i, end - i);
+        i = end;
+      }
     }
 
     // Iterates over each grapheme cluster in a string, invoking a callback for each one.
+    // Returning false from the callback stops the iteration.
     public void Each(string strText, EachBoolCallBack cb)
     {
-      SplitPrivate(strText, null, 0, null, cb);
+      Each(strText, 0, cb);
     }
 
-    // Iterates over each grapheme cluster in a string, invoking a callback for each one.
+    // Iterates over each grapheme cluster starting at nIndex, invoking a callback for each one.
+    // Returning false from the callback stops the iteration.
     public void Each(string strText, int nIndex, EachBoolCallBack cb)
     {
-      SplitPrivate(strText, null, nIndex, null, cb);
+      if (cb == null) throw new ArgumentNullException(nameof(cb));
+      if (string.IsNullOrEmpty(strText)) return;
+      CheckIndex(strText, nIndex);
+      int i = nIndex;
+      while (i < strText.Length) {
+        int end = NextBoundary(strText, i);
+        if (!cb(strText, i, end - i)) return;
+        i = end;
+      }
     }
 
     //  Splits a string into a list of its constituent grapheme clusters.
@@ -132,11 +243,14 @@ namespace GraphemeSplitterNET
       if (string.IsNullOrEmpty(strText)) {
         return new List<string>(0);
       }
-      // Allocate the result list with a reasonable initial capacity.
-      // Using strText.Length / 2 as heuristic to reduce reallocations:
-      // most grapheme clusters are 1-2 chars long, so we usually overestimate a bit.
-      var listResult = new List<string>(strText.Length / 2);
-      SplitPrivate(strText, listResult, 0, null, null);
+      // Most grapheme clusters are 1-2 chars long, so Length / 2 rarely needs to grow.
+      var listResult = new List<string>(strText.Length / 2 + 1);
+      int i = 0;
+      while (i < strText.Length) {
+        int end = NextBoundary(strText, i);
+        listResult.Add(strText.Substring(i, end - i));
+        i = end;
+      }
       return listResult;
     }
 
@@ -147,142 +261,45 @@ namespace GraphemeSplitterNET
     /// </summary>
     public List<int> GetBreaks(string strText)
     {
-       var boundaries = new List<int>(strText.Length / 2);
-       if (string.IsNullOrEmpty(strText)) return boundaries;
-       boundaries.Add(0); // First cluster always starts at 0
+      var boundaries = new List<int>(string.IsNullOrEmpty(strText) ? 0 : strText.Length / 2 + 1);
+      GetBreaks(strText, boundaries);
+      return boundaries;
+    }
 
-       // Reimplement core loop optimized for just indices
-       int riCounter = 0;
-       var history = new List<int>(4);
-
-       int currentIndex = 0;
-       int charLen;
-
-       int codePoint = GetCodePoint(strText, currentIndex);
-       int breakTypeLeft = GetGraphemeBreakProperty(codePoint);
-       charLen = codePoint >= 0x10000 ? 2 : 1;
-       currentIndex += charLen;
-       history.Add(breakTypeLeft);
-
-       while (currentIndex < strText.Length) {
-         codePoint = GetCodePoint(strText, currentIndex);
-         int breakTypeRight = GetGraphemeBreakProperty(codePoint);
-         int currentCodeLen = codePoint >= 0x10000 ? 2 : 1;
-
-         if (breakTypeLeft == Regional_Indicator) riCounter++; else riCounter = 0;
-
-         if (ShouldBreak(breakTypeLeft, breakTypeRight, history, riCounter)) {
-           boundaries.Add(currentIndex);
-           history.Clear();
-           riCounter = 0;
-         }
-
-         history.Add(breakTypeRight);
-         currentIndex += currentCodeLen;
-         breakTypeLeft = breakTypeRight;
-       }
-       // Last boundary is effectively the length, but usually not included as a "start index" of a cluster unless we want the end.
-       // The list is "Start Indices".
-       return boundaries;
+    /// <summary>
+    /// Same as GetBreaks(string) but appends into an existing list, so the list can be reused
+    /// between calls (zero allocation once the list has grown big enough).
+    /// </summary>
+    public void GetBreaks(string strText, List<int> boundaries)
+    {
+      if (boundaries == null) throw new ArgumentNullException(nameof(boundaries));
+      if (string.IsNullOrEmpty(strText)) return;
+      int i = 0;
+      while (i < strText.Length) {
+        boundaries.Add(i);
+        i = NextBoundary(strText, i);
+      }
     }
 
     /// <summary>
     /// Finds the index of the next grapheme cluster boundary after the specified start index.
-    /// This method is zero-allocation (if history list reused) and highly optimized for iterating or cursor movement.
+    /// Zero-allocation and highly optimized for iterating or cursor movement.
     /// </summary>
     /// <param name="strText">The text to analyze.</param>
-    /// <param name="startIndex">The index to start looking from.</param>
+    /// <param name="startIndex">The index to start looking from, assumed to be a cluster boundary.</param>
     /// <returns>The index of the next break, or strText.Length if no more breaks are found.</returns>
     public int NextBreak(string strText, int startIndex)
     {
       if (string.IsNullOrEmpty(strText) || startIndex >= strText.Length) return strText?.Length ?? 0;
-
-      int riCounter = 0;
-      // Optimize: Only allocate if we hit complex rules, or just accept the small alloc for now?
-      // For "Super Hyper" loops, user should use GetBreaks(). 
-      // NextBreak is for interactive cursor.
-      var history = new List<int>(4);
-
-      int currentIndex = startIndex;
-      int charLen;
-
-      int codePoint = GetCodePoint(strText, currentIndex);
-      int breakTypeLeft = GetGraphemeBreakProperty(codePoint);
-      charLen = codePoint >= 0x10000 ? 2 : 1;
-      currentIndex += charLen;
-      
-      // If we blindly start in the middle, we assume it's a valid boundary.
-      history.Add(breakTypeLeft);
-
-      while (currentIndex < strText.Length) {
-        codePoint = GetCodePoint(strText, currentIndex);
-        int breakTypeRight = GetGraphemeBreakProperty(codePoint);
-        int currentCodeLen = codePoint >= 0x10000 ? 2 : 1;
-
-        if (breakTypeLeft == Regional_Indicator) riCounter++; else riCounter = 0;
-
-        // Uses the same logic as SplitPrivate to decide if a break happens here
-        if (ShouldBreak(breakTypeLeft, breakTypeRight, history, riCounter)) {
-           return currentIndex; // Found the break!
-        }
-
-         history.Add(breakTypeRight);
-         currentIndex += currentCodeLen;
-         breakTypeLeft = breakTypeRight;
-      }
-      
-      return currentIndex; // End of string is always a break
+      if (startIndex < 0) startIndex = 0;
+      return NextBoundary(strText, startIndex);
     }
 
-    private int SplitPrivate(string strText, List<string> listResult, int currentIndex, EachVoidCallBack cbVoid, EachBoolCallBack cbBool)
+    private static void CheckIndex(string strText, int nIndex)
     {
-      if (string.IsNullOrEmpty(strText)) return 0;
-
-      int count = 0;
-      int riCounter = 0;
-      var history = new List<int>(4);
-
-      int charStart = 0;
-      int charLen;
-
-      int codePoint = GetCodePoint(strText, currentIndex);
-      int breakTypeLeft = GetGraphemeBreakProperty(codePoint);
-      charLen = codePoint >= 0x10000 ? 2 : 1;
-      currentIndex += charLen;
-      history.Add(breakTypeLeft);
-
-      while (currentIndex < strText.Length) {
-        codePoint = GetCodePoint(strText, currentIndex);
-        int breakTypeRight = GetGraphemeBreakProperty(codePoint);
-        int currentCodeLen = codePoint >= 0x10000 ? 2 : 1;
-
-        if (breakTypeLeft == Regional_Indicator) riCounter++; else riCounter = 0;
-
-        if (ShouldBreak(breakTypeLeft, breakTypeRight, history, riCounter)) {
-          listResult?.Add(strText.Substring(charStart, charLen));
-          cbVoid?.Invoke(strText, charStart, charLen);
-          if (cbBool != null && !cbBool(strText, charStart, charLen)) return count + 1;
-
-          count++;
-          charStart = currentIndex;
-          charLen = currentCodeLen;
-          history.Clear();
-          riCounter = 0;  // Reset RI counter when starting a new grapheme cluster
-        }
-        else {
-          charLen += currentCodeLen;
-        }
-
-        history.Add(breakTypeRight);
-        currentIndex += currentCodeLen;
-        breakTypeLeft = breakTypeRight;
+      if (nIndex < 0 || nIndex > strText.Length) {
+        throw new ArgumentOutOfRangeException(nameof(nIndex));
       }
-
-      listResult?.Add(strText.Substring(charStart, charLen));
-      cbVoid?.Invoke(strText, charStart, charLen);
-      if (cbBool != null && !cbBool(strText, charStart, charLen)) return count + 1;
-
-      return count + 1;
     }
   }
 }

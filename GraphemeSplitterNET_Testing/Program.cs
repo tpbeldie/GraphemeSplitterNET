@@ -1,4 +1,4 @@
-﻿using GraphemeSplitterNET;
+using GraphemeSplitterNET;
 using ST.Library.Text;
 using System;
 using System.Diagnostics;
@@ -10,12 +10,20 @@ namespace GraphemeSplitterNET_Testing
   {
     static void Main(string[] args)
     {
+      int iterations = 100_000;
+      if (args.Length > 0 && int.TryParse(args[0], out int customIter)) {
+        iterations = customIter;
+      }
+
+      Console.WriteLine($"Building test string with {iterations} iterations...");
       // Prepare test input.
       StringBuilder input = new StringBuilder();
-      for (int i = 0; i < 1_000_000; i++) {
+      for (int i = 0; i < iterations; i++) {
         input.Append("Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍A̴̵̜̰͔ͫ͗͢L̠ͨͧͩ͘G̴̻͈͍͔̹̑͗̎̅͛́Ǫ̵̹̻̝̳͂̌̌͘!͖̬̰̙̗̿̋ͥͥ̂ͣ̐́́͜͞'汉字👩‍🦰👩‍👩‍👦‍👦️‍Abc");
       }
       string testString = input.ToString();
+      Console.WriteLine($"Input length: {testString.Length:N0} characters.");
+      Console.WriteLine("Running benchmarks...");
 
       // Benchmark GraphemeSplitter.
       var splitter = new GraphemeSplitter();
@@ -69,31 +77,27 @@ namespace GraphemeSplitterNET_Testing
       sw.Stop();
       long time5 = sw.ElapsedMilliseconds;
 
-      Debug.WriteLine($"GraphemeSplitter: {clusters1.Count} clusters in {time1}ms");
-      Debug.WriteLine($"GraphemeSplitterBuffered: {clusters2.Count} clusters in {time2}ms");
-      Debug.WriteLine($"STGraphemeSplitter (No Cache): {clusters3_nocache.Count} clusters in {time3_nocache}ms");
-      Debug.WriteLine($"STGraphemeSplitter (Dict): {clusters3.Count} clusters in {time3}ms");
-      Debug.WriteLine($"STGraphemeSplitter (Array): {clusters4.Count} clusters in {time3_array}ms");
-      Debug.WriteLine($"NextBreak (Buffered Iteration): {countNextBreak} clusters in {time4}ms");
-      Debug.WriteLine($"GetBreaks (Buffered Indices): {breaks.Count} clusters in {time5}ms");
-      Debug.WriteLine($"Input length: {input.Length}");
+      Console.WriteLine();
+      Console.WriteLine("------------------- Benchmark Results -------------------");
+      Console.WriteLine($"GraphemeSplitter (Split):           {clusters1.Count:N0} clusters in {time1}ms");
+      Console.WriteLine($"GraphemeSplitterBuffered (Split):   {clusters2.Count:N0} clusters in {time2}ms");
+      Console.WriteLine($"GraphemeSplitter (NextBreak):       {countNextBreak:N0} clusters in {time4}ms");
+      Console.WriteLine($"GraphemeSplitter (GetBreaks):       {breaks.Count:N0} clusters in {time5}ms");
+      Console.WriteLine($"STGraphemeSplitter (Dict Cache):    {clusters3.Count:N0} clusters in {time3}ms");
+      Console.WriteLine($"STGraphemeSplitter (Array Cache):   {clusters4.Count:N0} clusters in {time3_array}ms");
+      Console.WriteLine($"STGraphemeSplitter (No Cache):      {clusters3_nocache.Count:N0} clusters in {time3_nocache}ms");
+      Console.WriteLine("---------------------------------------------------------");
+      Console.WriteLine();
 
-      // Show first few clusters from each splitter to verify correctness.
-      Debug.WriteLine("First 20 grapheme clusters (GraphemeSplitter):");
-      for (int i = 0; i < Math.Min(20, clusters1.Count); i++) {
-        Debug.WriteLine($"'{clusters1[i]}'");
-      }
-      Debug.WriteLine("First 20 grapheme clusters (GraphemeSplitterBuffered):");
-      for (int i = 0; i < Math.Min(20, clusters2.Count); i++) {
-        Debug.WriteLine($"'{clusters2[i]}'");
-      }
-      Debug.WriteLine("First 20 grapheme clusters (STGraphemeSplitter):");
-      for (int i = 0; i < Math.Min(20, clusters3.Count); i++) {
-        Debug.WriteLine($"'{clusters3[i]}'");
+      Console.WriteLine("First 10 clusters (GraphemeSplitter):");
+      for (int i = 0; i < Math.Min(10, clusters1.Count); i++) {
+        Console.WriteLine($"  [{i}] '{clusters1[i]}'");
       }
 
-      Console.WriteLine("Benchmark complete. See Output window for details.");
-      Console.ReadLine();
+      if (!Console.IsInputRedirected && args.Length == 0) {
+        Console.WriteLine("\nPress Enter to exit...");
+        Console.ReadLine();
+      }
     }
   }
 }
